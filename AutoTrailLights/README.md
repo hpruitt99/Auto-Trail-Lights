@@ -48,6 +48,6 @@ Tower Lights, so you can still select, move or bulldoze them one by one.
 
 ## Credits
 
-- **Author:** made by hpruitt99 with Claude (Anthropic), an AI assistant, which wrote the code.
+- **Author:** made by iPros with Claude (Anthropic), an AI assistant, which wrote the code.
 - **Assets:** uses the game's own Tower Light. The mod contains no game files.
 - **Loader:** UE4SS (RE-UE4SS, MIT).

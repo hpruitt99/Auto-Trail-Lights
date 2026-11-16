@@ -43,7 +43,7 @@ The script is all in [`AutoTrailLights/Scripts/main.lua`](AutoTrailLights/Script
 
 ## Credits
 
-- **Author:** made by [hpruitt99](https://github.com/hpruitt99) with Claude (Anthropic), an AI assistant, which wrote the code.
+- **Author:** made by iPros with Claude (Anthropic), an AI assistant, which wrote the code.
 - **Loader:** [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS) (MIT).
 - **Map Creator:** thanks to the Ski-E-O Map Creator community for its modding notes.
 
