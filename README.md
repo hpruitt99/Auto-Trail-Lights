@@ -17,6 +17,9 @@ the normal price and turns Night skiing on.
 
 ## Install
 
+**Back up your saves first.** Copy `%LOCALAPPDATA%\Ski-E-O\SaveGames` somewhere safe before you use any mod.
+Steam Cloud syncs that folder, so a broken save can reach your other PCs too.
+
 1. Install Oof's [Ski-E-O Map Creator](https://github.com/oofbyte/Skieo-Map-Creator). It sets up the mod loader (UE4SS 3.0.1) in
    `SkiResortSimulator\Binaries\Win64`.
 2. Copy the [`AutoTrailLights`](AutoTrailLights) folder into `SkiResortSimulator\Binaries\Win64\ue4ss\Mods\`.
