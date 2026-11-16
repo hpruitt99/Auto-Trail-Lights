@@ -28,7 +28,8 @@ Tower Lights, so you can still select, move or bulldoze them one by one.
 
 ## Install
 
-1. Install UE4SS: the Map Creator does this, or use UE4SS 3.0.1 in `SkiResortSimulator\Binaries\Win64`.
+1. Install Oof's Ski-E-O Map Creator (https://github.com/oofbyte/Skieo-Map-Creator). It sets up the mod loader (UE4SS 3.0.1)
+   in `SkiResortSimulator\Binaries\Win64`.
 2. Copy the `AutoTrailLights` folder into `SkiResortSimulator\Binaries\Win64\ue4ss\Mods\`.
 3. Add the line `AutoTrailLights : 1` to `ue4ss\Mods\mods.txt`, above `Keybinds : 1` if that line is there.
 4. Start the game. `ue4ss\UE4SS.log` should show `[AutoTrailLights] loaded`.
@@ -44,10 +45,11 @@ Tower Lights, so you can still select, move or bulldoze them one by one.
   is charged the way the game charges it.
 - Very wide trails need more lights. Parts that are too far from either edge for any light to reach stay dark, and
   the panel says when that happens.
-- Tested with game build CL7848 (2026-11-15) and UE4SS 3.0.1 beta (git 83330635).
+- Tested with game build CL7848 (2026-11-15) and the mod loader from Oof's Map Creator (UE4SS 3.0.1 beta, git
+  83330635).
 
 ## Credits
 
 - **Author:** made by iPros with Claude (Anthropic), an AI assistant, which wrote the code.
 - **Assets:** uses the game's own Tower Light. The mod contains no game files.
-- **Loader:** UE4SS (RE-UE4SS, MIT).
+- **Loader:** Oof's Ski-E-O Map Creator, which installs UE4SS (RE-UE4SS, MIT).
