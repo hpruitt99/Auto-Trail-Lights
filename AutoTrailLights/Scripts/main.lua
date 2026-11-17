@@ -23,7 +23,7 @@
 local TAG = "[AutoTrailLights] "
 local M = rawget(_G, "AUTO_TRAIL_LIGHTS") or {}       -- the same table if this file runs again: no second loops
 _G.AUTO_TRAIL_LIGHTS = M
-M.VERSION = "1.1.0"
+M.VERSION = "1.1.1"
 M.stopped = false                                  -- this file running means the mod is on (see live switching below)
 
 local CFG = {
@@ -407,6 +407,24 @@ local function arrayItem(o)                        -- TArray items can come wrap
   if o ~= nil and type(o) == "userdata" and o.IsValid == nil and o.get then return o:get() end
   return o
 end
+-- A Tower Light has more than one spot light: NightSpot, plus one the game's light-quality system adds at runtime
+-- and fades to (it copies NightSpot's color at that moment, so one made before a recolor stays white). The beam you
+-- see can be either, so every color change goes to all of them.
+local LOCAL_LIGHT
+local function beams(a)
+  LOCAL_LIGHT = LOCAL_LIGHT or StaticFindObject("/Script/Engine.LocalLightComponent")
+  local list = {}
+  pcall(function()
+    local ls = a:K2_GetComponentsByClass(LOCAL_LIGHT)
+    for i = 1, #ls do
+      local c = arrayItem(ls[i])
+      if c ~= nil and c.IsValid ~= nil and c:IsValid() then list[#list + 1] = c end
+    end
+  end)
+  if #list == 0 then pcall(function() if valid(a.NightSpot) then list[1] = a.NightSpot end end) end
+  return list
+end
+
 local MESH_CLASS
 local function glowMaterial(a)
   MESH_CLASS = MESH_CLASS or StaticFindObject("/Script/Engine.StaticMeshComponent")
@@ -431,7 +449,8 @@ end
 -- the game speed or frame rate.
 local EMISSIVE = FName("EmssiveColor")
 M.party = M.party or {}
-local partyList, partyDirty, partyCursor = {}, true, 0
+local partyList, partyDirty, partyCursor, partyTick = {}, true, 0, 0
+local BEAMS_RECHECK = 90                           -- frames between looks at a party light's spot lights
 
 -- Each party light's distance along its own trail (from the trail's start), so the rainbow runs down the trail
 -- like an LED strip and the two lights of a pair always match. Trails are sampled once (plain Lua, no game calls)
@@ -470,8 +489,6 @@ local function partyAdd(a)
   local key = a:GetFullName()
   if M.party[key] and valid(M.party[key].a) then return end
   local l = a:K2_GetActorLocation()
-  local spot
-  pcall(function() spot = a.NightSpot end)
   local mid
   pcall(function() mid = glowMaterial(a) end)
   local s
@@ -479,7 +496,8 @@ local function partyAdd(a)
     local trailName = splitName(a.InstanceName:ToString()):match(NAME_PATTERN)
     s = alongTrail(trailName, l.X, l.Y)
   end)
-  M.party[key] = { a = a, spot = spot, mid = mid, s = s or (l.X * 0.7071 + l.Y * 0.7071) }
+  M.party[key] = { a = a, beams = beams(a), beamsAt = partyTick + BEAMS_RECHECK, mid = mid,
+                    s = s or (l.X * 0.7071 + l.Y * 0.7071) }
   partyDirty = true
 end
 
@@ -499,6 +517,7 @@ local function hsv(h)                              -- full saturation and value,
 end
 
 function M.partyStep()
+  partyTick = partyTick + 1
   if partyDirty then
     partyList = {}
     for _, e in pairs(M.party) do partyList[#partyList + 1] = e end
@@ -519,7 +538,8 @@ function M.partyStep()
     else
       local h = phase - e.s / CFG.PARTY_WAVE
       local c = hsv(h - math.floor(h))
-      if e.spot and valid(e.spot) then e.spot:SetLightColor(c, true) end
+      if partyTick >= e.beamsAt then e.beams, e.beamsAt = beams(e.a), partyTick + BEAMS_RECHECK end
+      for _, b in ipairs(e.beams) do if valid(b) then b:SetLightColor(c, true) end end
       if e.mid and valid(e.mid) then e.mid:SetVectorParameterValue(EMISSIVE, c) end
     end
   end
@@ -531,7 +551,7 @@ local function paint(a, hex)
   partyDrop(a)
   local spot, glow = DEFAULT_SPOT, DEFAULT_GLOW
   if hex then spot = hexLinear(hex); glow = spot end
-  pcall(function() local sp = a.NightSpot; if valid(sp) then sp:SetLightColor(spot, true) end end)
+  for _, b in ipairs(beams(a)) do pcall(function() b:SetLightColor(spot, true) end) end
   pcall(function()
     local g = glowMaterial(a)
     if valid(g) then g:SetVectorParameterValue(EMISSIVE, glow) end
@@ -575,11 +595,13 @@ function M.repaintAll()
           if okk and not M.party[key] then paint(a, hex); n = n + 1 end
         elseif hex then
           local want = { hexRGB(hex) }
-          local okc, c = pcall(function() local lc = a.NightSpot.LightColor; return { lc.R, lc.G, lc.B } end)
-          if not okc or math.abs(c[1] - want[1]) > SPOT_CHECK or math.abs(c[2] - want[2]) > SPOT_CHECK
-             or math.abs(c[3] - want[3]) > SPOT_CHECK then
-            paint(a, hex); n = n + 1
+          local off = false
+          for _, b in ipairs(beams(a)) do
+            local okc, c = pcall(function() local lc = b.LightColor; return { lc.R, lc.G, lc.B } end)
+            if not okc or math.abs(c[1] - want[1]) > SPOT_CHECK or math.abs(c[2] - want[2]) > SPOT_CHECK
+               or math.abs(c[3] - want[3]) > SPOT_CHECK then off = true; break end
           end
+          if off then paint(a, hex); n = n + 1 end
         end
       end
     end
