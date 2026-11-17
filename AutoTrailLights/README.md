@@ -28,9 +28,6 @@ Tower Lights, so you can still select, move or bulldoze them one by one.
 
 ## Install
 
-**Back up your saves first.** Copy `%LOCALAPPDATA%\Ski-E-O\SaveGames` somewhere safe before you use any mod.
-Steam Cloud syncs that folder, so a broken save can reach your other PCs too.
-
 1. Install [Z's Mod Loader](https://mods.bigz.studio/) with its installer, then open **Ski-E-O Mod Manager**.
 2. Under **Discover**, find **Auto Trail Lights** and install it. It's listed once the release is approved.
    - To install by hand instead, copy the `AutoTrailLights` folder into the game's `mods` folder
