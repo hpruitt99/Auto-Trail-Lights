@@ -31,8 +31,19 @@ Tower Lights, so you can still select, move or bulldoze them one by one.
 **Back up your saves first.** Copy `%LOCALAPPDATA%\Ski-E-O\SaveGames` somewhere safe before you use any mod.
 Steam Cloud syncs that folder, so a broken save can reach your other PCs too.
 
-1. Install Oof's Ski-E-O Map Creator (https://github.com/oofbyte/Skieo-Map-Creator). It sets up the mod loader (UE4SS 3.0.1)
-   in `SkiResortSimulator\Binaries\Win64`.
+### With Z's Mod Loader
+
+1. Install [Z's Mod Loader](https://mods.bigz.studio/) with its installer, then open **Ski-E-O Mod Manager**.
+2. Under **Discover**, find **Auto Trail Lights** and install it. It's listed once the release is approved.
+   - To install by hand instead, copy the `AutoTrailLights` folder into the game's `mods` folder
+     (`skieogame\mods\`), then turn it on under **Mods → Installed**.
+3. Start the game.
+
+The Mod Manager can switch the mod off and on while the game is running. Lights you've already placed stay.
+
+### With UE4SS only (Oof's Map Creator)
+
+1. Install Oof's Ski-E-O Map Creator (https://github.com/oofbyte/Skieo-Map-Creator). It sets up UE4SS 3.0.1 in `SkiResortSimulator\Binaries\Win64`.
 2. Copy the `AutoTrailLights` folder into `SkiResortSimulator\Binaries\Win64\ue4ss\Mods\`.
 3. Add the line `AutoTrailLights : 1` to `ue4ss\Mods\mods.txt`, above `Keybinds : 1` if that line is there.
 4. Start the game. `ue4ss\UE4SS.log` should show `[AutoTrailLights] loaded`.
@@ -48,8 +59,8 @@ Steam Cloud syncs that folder, so a broken save can reach your other PCs too.
   is charged the way the game charges it.
 - Very wide trails need more lights. Parts that are too far from either edge for any light to reach stay dark, and
   the panel says when that happens.
-- Tested with game build CL7848 (2026-11-15) and the mod loader from Oof's Map Creator (UE4SS 3.0.1 beta, git
-  83330635).
+- Tested with game build CL7848 (2026-11-15) on Z's Mod Loader 1.3, and on the UE4SS from Oof's Map Creator
+  (UE4SS 3.0.1 beta, git 83330635).
 
 ## Credits
 

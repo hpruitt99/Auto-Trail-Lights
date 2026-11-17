@@ -23,6 +23,8 @@
 local TAG = "[AutoTrailLights] "
 local M = rawget(_G, "AUTO_TRAIL_LIGHTS") or {}       -- the same table if this file runs again: no second loops
 _G.AUTO_TRAIL_LIGHTS = M
+M.VERSION = "1.1.0"
+M.stopped = false                                  -- this file running means the mod is on (see live switching below)
 
 local CFG = {
   TOWER_CLASS     = "/Game/Blueprints/Decorations/BP_TowerLight.BP_TowerLight_C",
@@ -1230,6 +1232,7 @@ local function pollSliders()
 end
 
 function M.poll()                                  -- every frame: a click lasts one frame
+  if M.stopped then return end
   frame = frame + 1
   if M.job then
     local ok, err = pcall(M.stepJob)
@@ -1264,6 +1267,7 @@ end
 
 local bgTick = 0
 function M.background()                            -- 4 times a second
+  if M.stopped then return end
   bgTick = bgTick + 1
   if bgTick % 20 == 0 and not P.slideAt then       -- every 5 s (not mid-drag): saved colors back on lights
     local ok, err = pcall(M.repaintAll)
@@ -1301,7 +1305,35 @@ if not M.started then
   M.started = true
   LoopInGameThreadAfterFrames(1, guarded("poll", function() M.poll() end))
   LoopInGameThreadAfterFrames(15, guarded("background", function() M.background() end))
-  log("loaded - open a trail's panel, Edit tab: \"Trail lights\"")
+  log("loaded " .. M.VERSION .. " - open a trail's panel, Edit tab: \"Trail lights\"")
+end
+
+-- Z's Mod Loader live switching (its Mod Manager can turn mods on and off while the game runs): say we're on at
+-- startup; on unload stop working, take the Trail lights section out of the panel and clear the flag. Lights already
+-- placed stay: they're ordinary buildings, saved with the resort. Without that loader (plain UE4SS) this only sets
+-- an unused shared variable.
+local ENABLED_KEY = "SkiEOMods.enabled.AutoTrailLights"
+local function setEnabledFlag(on)
+  if on then pcall(function() ModRef:SetSharedVariable(ENABLED_KEY, true) end) return end
+  if not pcall(function() ModRef:SetSharedVariable(ENABLED_KEY, nil) end) then
+    pcall(function() ModRef:SetSharedVariable(ENABLED_KEY, false) end)
+  end
+end
+if ModRef then
+  setEnabledFlag(true)
+  pcall(function()
+    ModRef.OnUnload = function()
+      M.stopped = true
+      if M.job then log("switched off while placing lights: stopped there"); M.job = nil end
+      pcall(function()
+        local root = M.P and M.P.root
+        if root and root:IsValid() then root:RemoveFromParent() end
+      end)
+      if M.P then M.P.owner, M.P.root, M.P.key = nil, nil, nil end
+      setEnabledFlag(false)
+      log("switched off")
+    end
+  end)
 end
 
 return M
