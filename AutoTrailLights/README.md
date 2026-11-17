@@ -54,12 +54,16 @@ The Mod Manager can switch the mod off and on while the game is running. Lights 
 - Lights go in one per frame, so you can watch them appear along the trail. The button counts up while it works. A
   long trail takes a second or two, and the game doesn't freeze.
 - Bowls don't get the section, because they're open areas without two edges to line with lights.
+- The game only loads the Tower Light once a resort has one. So in a resort with none yet, the first install
+  picks the Tower Light in the build menu for a moment, which loads it. Anything you were placing at that
+  moment is cancelled.
+- Tower Lights must be unlocked in the resort. If they aren't yet, the panel says so.
 - Lights go 4.5 m outside the trail's edge. Spots steeper than the game allows for a Tower Light (40°), on another
   trail, or within 8 m of a building are skipped or moved a little along the edge. Trees under a light are cleared, and the clearing
   is charged the way the game charges it.
 - Very wide trails need more lights. Parts that are too far from either edge for any light to reach stay dark, and
   the panel says when that happens.
-- Tested with game build CL7848 (2026-11-15) on Z's Mod Loader 1.3, and on the UE4SS from Oof's Map Creator
+- Tested with game builds CL7848 and CL7918 on Z's Mod Loader 1.3, and on the UE4SS from Oof's Map Creator
   (UE4SS 3.0.1 beta, git 83330635).
 
 ## Credits

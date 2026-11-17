@@ -53,7 +53,7 @@ The script is all in [`AutoTrailLights/Scripts/main.lua`](AutoTrailLights/Script
 
 ## Compatibility
 
-- Tested with game build CL7848 (2026-11-15) on Z's Mod Loader 1.3, and on the UE4SS from Oof's Map Creator
+- Tested with game builds CL7848 and CL7918 on Z's Mod Loader 1.3, and on the UE4SS from Oof's Map Creator
   (UE4SS 3.0.1 beta, git 83330635).
 - Single-player game; the mod contains no game files.
 

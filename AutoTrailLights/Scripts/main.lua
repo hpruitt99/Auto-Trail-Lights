@@ -23,7 +23,7 @@
 local TAG = "[AutoTrailLights] "
 local M = rawget(_G, "AUTO_TRAIL_LIGHTS") or {}       -- the same table if this file runs again: no second loops
 _G.AUTO_TRAIL_LIGHTS = M
-M.VERSION = "1.1.1"
+M.VERSION = "1.1.2"
 M.stopped = false                                  -- this file running means the mod is on (see live switching below)
 
 local CFG = {
@@ -104,7 +104,7 @@ local function refs(force)                         -- FindAllOf walks every obje
   if not valid(R.tm) or refsTick % 40 == 0 then  -- every ~10 s make sure it's still the loaded resort's
     local tm = pickTrailMap()
     if tm ~= nil and not (valid(R.tm) and sameObj(tm, R.tm)) then
-      R.tm, R.eco, R.obs, R.reg, R.world = tm, nil, nil, nil, nil
+      R.tm, R.eco, R.obs, R.reg, R.world, R.dock = tm, nil, nil, nil, nil, nil
     end
   end
   if not valid(R.tm) then return R end
@@ -115,11 +115,24 @@ local function refs(force)                         -- FindAllOf walks every obje
   if not valid(R.reg) then R.reg = findIn("PlaceableRegistrySubsystem", R.world) end
   if not valid(R.TU) then R.TU = StaticFindObject("/Script/SkiResortSimulator.Default__TerrainUtils") end
   if not valid(R.GS) then R.GS = StaticFindObject("/Script/Engine.Default__GameplayStatics") end
-  if not valid(R.cls) then R.cls = StaticFindObject(CFG.TOWER_CLASS) end
   return R
 end
-local function ready(r)
-  return valid(r.tm) and valid(r.TU) and valid(r.world) and valid(r.GS) and valid(r.cls) and valid(r.reg)
+-- what's still missing before the mod can work in this resort (nil: nothing). The Tower Light's class isn't in this
+-- list: in a resort without Tower Lights the game hasn't loaded it yet, and placing loads it (see loadTower).
+local function notReady(r)
+  if not valid(r.tm) then return "the trails aren't loaded yet" end
+  if not valid(r.world) then return "the resort's world isn't loaded yet" end
+  if not valid(r.reg) then return "the resort's buildings aren't loaded yet" end
+  if not valid(r.TU) then return "the game's terrain helper is missing" end
+  if not valid(r.GS) then return "the engine's spawn helper is missing" end
+  return nil
+end
+local function ready(r) return notReady(r) == nil end
+local lastNotReady
+local function notReadyMessage(r)
+  local why = notReady(r) or "unknown"
+  if why ~= lastNotReady then lastNotReady = why; log("not ready: " .. why) end
+  return "The resort isn't ready: " .. why .. ". Try again in a moment."
 end
 
 -- An actor the mod destroyed stays findable (and IsValid) until the engine's garbage collection, and
@@ -644,7 +657,7 @@ end
 function M.prepare(trail)
   if trail.shape == 1 then return nil, "Bowls don't get trail lights." end
   local r = refs(true)
-  if not ready(r) then return nil, "The resort isn't loaded." end
+  if not ready(r) then return nil, notReadyMessage(r) end
   local tm = r.tm
   local ctx = { trail = trail, r = r, radius = lightRadius(), slopeMax = maxSlope() }
   ctx.reach = ctx.radius * CFG.COVER
@@ -826,7 +839,7 @@ local function removeOne(r, a)
   return v
 end
 
-local function spawnTower(r, sp, name, hex)
+local function spawnTower(r, cls, sp, name, hex)
   local z = r.TU:GetHeightAtLocation(r.world, { X = sp.x, Y = sp.y })
   if valid(r.obs) and r.obs:IsLocationBlocked({ X = sp.x, Y = sp.y, Z = z }, 300) then
     pcall(function() r.obs:ClearObstaclesInRadius({ X = sp.x, Y = sp.y, Z = z }, CFG.CLEAR_RADIUS, true) end)
@@ -834,7 +847,7 @@ local function spawnTower(r, sp, name, hex)
   local h = math.rad(sp.yaw) / 2
   local xf = { Rotation = { X = 0, Y = 0, Z = math.sin(h), W = math.cos(h) }, Translation = { X = sp.x, Y = sp.y, Z = z },
                Scale3D = { X = 1, Y = 1, Z = 1 } }
-  local a = r.GS:BeginDeferredActorSpawnFromClass(r.world, r.cls, xf, 1, nil, 0)   -- 1: always spawn
+  local a = r.GS:BeginDeferredActorSpawnFromClass(r.world, cls, xf, 1, nil, 0)     -- 1: always spawn
   if not valid(a) then return nil end
   a = r.GS:FinishSpawningActor(a, xf, 0)
   if not valid(a) then return nil end
@@ -845,6 +858,63 @@ local function spawnTower(r, sp, name, hex)
   return a
 end
 
+-- Loading the Tower Light's class. The game only loads a building's class when one exists in the resort or it's
+-- picked in the build menu, so in a resort without Tower Lights there's nothing to spawn from (1.1.1 said "The resort
+-- isn't loaded" there). The mod then picks the Tower Light in the build dock, which loads it (sometimes over a few
+-- frames) and starts placing one; waits for the class; stops placing; and spawns two frames later, once the build
+-- menu's preview is gone. The class stays loaded once a Tower Light stands. Same steps as Better Trails.
+-- loadTower(r, j) runs once a frame from the job: returns the class when it can be used, nil while loading, or
+-- false, message when it can't be loaded.
+local LOAD_TIMEOUT = 600                           -- frames (about 10 s)
+local function dockOf(r)
+  if not valid(r.dock) then r.dock = findIn("BuildDockComponent", r.world) or FindFirstOf("BuildDockComponent") end
+  return valid(r.dock) and r.dock or nil
+end
+local function stopPlacing(r)
+  local dock = dockOf(r)
+  if dock then pcall(function() dock:OnDockCategoryChanged(0) end) end   -- 0: None (stops placing)
+end
+local function loadTower(r, j)
+  local L = j.load
+  if not L then
+    local c = StaticFindObject(CFG.TOWER_CLASS)
+    if valid(c) then return c end
+    L = { phase = "select", tries = 0 }
+    j.load = L
+  end
+  if L.phase == "select" then
+    local dock = dockOf(r)
+    if not dock then return false, "couldn't find the build menu" end
+    L.tries = L.tries + 1
+    if L.tries > 2 then return false, "couldn't load the game's Tower Light (is it unlocked yet?)" end
+    pcall(function() dock:OnPaletteItemSelected(3, FName("TowerLight"), FName("None")) end)   -- 3: Buildings
+    L.phase, L.at = "wait", M.tick
+    return nil
+  end
+  if L.phase == "wait" then                        -- the class appears (now or a few frames later)
+    if valid(StaticFindObject(CFG.TOWER_CLASS)) and M.tick - L.at >= 2 then
+      stopPlacing(r)
+      L.phase, L.at = "settle", M.tick
+    elseif M.tick - L.at > LOAD_TIMEOUT then
+      stopPlacing(r)
+      return false, "couldn't load the game's Tower Light (is it unlocked yet?)"
+    end
+    return nil
+  end
+  if L.phase == "settle" then                      -- the preview is gone: spawn
+    if M.tick - L.at < 2 then return nil end
+    local c = StaticFindObject(CFG.TOWER_CLASS)
+    if valid(c) then
+      j.load = nil
+      log("loaded the Tower Light")
+      return c
+    end
+    L.phase = "select"                             -- collected in between: once more
+    return nil
+  end
+  return nil
+end
+
 -- Placing and removing run a little every frame (M.job, stepped by M.stepJob from the per-frame loop): dozens of
 -- lights in one frame froze the game for a second. The old lights go first (sold back), then the new ones, one a frame.
 
@@ -852,7 +922,7 @@ end
 function M.apply(p)
   if M.job then return "Still busy with the last change." end
   local r = refs(true)
-  if not ready(r) then return "The resort isn't loaded." end
+  if not ready(r) then return notReadyMessage(r) end
   if p.same then return "Already installed." end
   if valid(r.eco) and p.net > 0 and not r.eco:CanAfford(p.net) then
     return "Not enough money: " .. money(p.net) .. " needed."
@@ -886,7 +956,7 @@ end
 function M.remove(trail)
   if M.job then return "Still busy with the last change." end
   local r = refs(true)
-  if not ready(r) then return "The resort isn't loaded." end
+  if not ready(r) then return notReadyMessage(r) end
   M.job = { kind = "remove", trail = trail, world = r.world, remove = M.ourLights(trail), ri = 1, removed = 0, back = 0 }
   return nil
 end
@@ -929,11 +999,17 @@ function M.stepJob()
   end
   if j.kind ~= "place" then finishJob(j, r) return end
   for _ = 1, CFG.SPAWN_PER_FRAME do                -- 2. the new ones
+    if not valid(j.cls) then
+      local c, why = loadTower(r, j)
+      if c == false then finishJob(j, r, why) return end
+      if not c then return end                     -- still loading: next frame
+      j.cls = c
+    end
     local i = j.si
     local sp = j.p.towers[i]
     if not sp then break end
     j.si = i + 1
-    local a = spawnTower(r, sp, j.trail.name .. CFG.NAME_SUFFIX .. i .. (j.tag and (COLOR_SEP .. j.tag) or ""), j.hex)
+    local a = spawnTower(r, j.cls, sp, j.trail.name .. CFG.NAME_SUFFIX .. i .. (j.tag and (COLOR_SEP .. j.tag) or ""), j.hex)
     if not a then log("a tower didn't spawn at " .. math.floor(sp.x) .. ", " .. math.floor(sp.y)) else
       local cost = j.p.cost
       pcall(function() if a.BaseCost > 0 and a.BaseCost < 100000 then cost = a.BaseCost; M.knownCost = cost end end)
@@ -952,6 +1028,7 @@ function M.jobProgress()
   local j = M.job
   if not j then return nil end
   if j.ri <= #j.remove then return string.format("Removing old lights...  %d / %d", j.ri - 1, #j.remove) end
+  if j.load then return "Getting the Tower Light ready..." end
   if j.kind == "place" then return string.format("Placing lights...  %d / %d", j.si - 1, #j.p.towers) end
   return "Removing lights..."
 end
@@ -1255,6 +1332,7 @@ end
 
 function M.poll()                                  -- every frame: a click lasts one frame
   if M.stopped then return end
+  M.tick = (M.tick or 0) + 1
   frame = frame + 1
   if M.job then
     local ok, err = pcall(M.stepJob)
