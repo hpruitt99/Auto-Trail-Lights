@@ -23,7 +23,7 @@
 local TAG = "[AutoTrailLights] "
 local M = rawget(_G, "AUTO_TRAIL_LIGHTS") or {}       -- the same table if this file runs again: no second loops
 _G.AUTO_TRAIL_LIGHTS = M
-M.VERSION = "1.1.2"
+M.VERSION = "1.1.3"
 M.stopped = false                                  -- this file running means the mod is on (see live switching below)
 
 local CFG = {
@@ -1053,12 +1053,17 @@ M.P = P
 P.styleOf = P.styleOf or {}                        -- trail id -> the style picked in the panel (this session)
 
 local function newWidget(tree, cn) return StaticConstructObject(StaticFindObject("/Script/UMG." .. cn), tree) end
+-- Text in the game's own UI font (as in Better Trails): the panel's plain labels use the game's default font, with
+-- no font asset set, so the mod copies one of them (P.fontSrc) and only changes the size. Without one, the engine's
+-- Roboto. Only those plain labels are copied: copying a label whose font has its own font asset crashed the game.
+local SIZE = { title = 14, heading = 12, button = 12, note = 11 }
 local function newText(tree, s, size, color, bold)
   local t = newWidget(tree, "TextBlock")
   t:SetText(FText(s))
-  local f = t.Font                                 -- edit the default font in place: a partial struct table crashes
+  local copied = valid(P.fontSrc) and pcall(function() t:SetFont(P.fontSrc.Font) end)
+  local f = t.Font                                 -- edit the font in place: a partial struct table crashes
   f.Size = size
-  f.TypefaceFontName = FName(bold and "Bold" or "Regular")
+  if not copied then f.TypefaceFontName = FName(bold and "Bold" or "Regular") end
   t:SetFont(f)
   t:SetColorAndOpacity({ SpecifiedColor = color, ColorUseRule = 0 })
   return t
@@ -1066,9 +1071,13 @@ end
 local function newButton(tree, row, label, fill, fn)
   local b = newWidget(tree, "Button")
   b:SetBackgroundColor(C.off)
-  local t = newText(tree, label, 10, C.text, true)
+  local t = newText(tree, label, SIZE.button, C.text, true)
   t:SetJustification(1)
-  b:SetContent(t)
+  local fit = newWidget(tree, "ScaleBox")          -- a long label ("Remove ($23,780)") shrinks to fit; never grows
+  pcall(function() fit:SetStretch(2) end)          -- EStretch::ScaleToFit
+  pcall(function() fit:SetStretchDirection(1) end) -- EStretchDirection::DownOnly
+  fit:SetContent(t)
+  b:SetContent(fit)
   local s = row:AddChildToHorizontalBox(b)
   s:SetPadding({ Left = 2, Top = 0, Right = 2, Bottom = 0 })
   s:SetSize({ Value = fill or 1, SizeRule = 1 })
@@ -1102,8 +1111,12 @@ local function inject(w)
   local box = w.EditTabContent
   if not (valid(tree) and valid(box)) then return false end
   P.controls = {}
+  P.fontSrc = nil                                  -- a game label to copy the font from (the same ones as Better Trails)
+  for _, k in ipairs({ "GroomNowLabel", "EditShapeButtonLabel", "OpenClosedToggleLabel", "LengthLabel" }) do
+    if not P.fontSrc then pcall(function() if valid(w[k]) then P.fontSrc = w[k] end end) end
+  end
   local root = newWidget(tree, "VerticalBox")
-  local title = newText(tree, "Trail lights", 11, C.text, true)
+  local title = newText(tree, "Trail lights", SIZE.title, C.text, true)
   root:AddChildToVerticalBox(title):SetPadding({ Left = 2, Top = 0, Right = 2, Bottom = 3 })
 
   local styles = newWidget(tree, "HorizontalBox")
@@ -1118,7 +1131,7 @@ local function inject(w)
 
   local actions = newWidget(tree, "HorizontalBox")
   root:AddChildToVerticalBox(actions):SetPadding({ Left = 0, Top = 0, Right = 0, Bottom = 3 })
-  P.main = newButton(tree, actions, "Install trail lights", 3, function()
+  P.main = newButton(tree, actions, "Install trail lights", 1, function()
     if not P.plan then return end
     local msg = M.apply(P.plan)                    -- runs over the next frames; the panel re-plans when it's done
     if msg then P.msg = msg; P.key = nil end
@@ -1129,14 +1142,14 @@ local function inject(w)
     if msg then P.msg = msg; P.key = nil end
   end)
 
-  P.note = newText(tree, "", 9, C.dim, false)
+  P.note = newText(tree, "", SIZE.note, C.dim, false)
   P.note:SetAutoWrapText(true)
   root:AddChildToVerticalBox(P.note):SetPadding({ Left = 2, Top = 0, Right = 2, Bottom = 0 })
 
   -- light color: shown once this trail has the mod's lights
   P.colorBox = newWidget(tree, "VerticalBox")
   root:AddChildToVerticalBox(P.colorBox):SetPadding({ Left = 0, Top = 8, Right = 0, Bottom = 0 })
-  P.colorTitle = newText(tree, "Light color", 10, C.text, true)
+  P.colorTitle = newText(tree, "Light color", SIZE.heading, C.text, true)
   P.colorBox:AddChildToVerticalBox(P.colorTitle):SetPadding({ Left = 2, Top = 0, Right = 2, Bottom = 3 })
   local sw = newWidget(tree, "HorizontalBox")
   P.colorBox:AddChildToVerticalBox(sw):SetPadding({ Left = 0, Top = 0, Right = 0, Bottom = 3 })
@@ -1168,13 +1181,13 @@ local function inject(w)
   for _, ch in ipairs({ "R", "G", "B" }) do
     local row = newWidget(tree, "HorizontalBox")
     P.sliderBox:AddChildToVerticalBox(row):SetPadding({ Left = 2, Top = 1, Right = 2, Bottom = 1 })
-    local lab = newText(tree, ch, 9, C.dim, true)
+    local lab = newText(tree, ch, SIZE.note, C.dim, true)
     local ls = row:AddChildToHorizontalBox(lab)
     ls:SetPadding({ Left = 0, Top = 0, Right = 6, Bottom = 0 }); ls:SetVerticalAlignment(2)
     local sl = newWidget(tree, "Slider")             -- 0..1, shown as 0..255
     local ss = row:AddChildToHorizontalBox(sl)
     ss:SetSize({ Value = 1, SizeRule = 1 }); ss:SetVerticalAlignment(2)
-    local val = newText(tree, "255", 9, C.dim, false)
+    local val = newText(tree, "255", SIZE.note, C.dim, false)
     local vs = row:AddChildToHorizontalBox(val)
     vs:SetPadding({ Left = 6, Top = 0, Right = 0, Bottom = 0 }); vs:SetVerticalAlignment(2)
     P.sliders[#P.sliders + 1] = { w = sl, val = val, last = nil }
